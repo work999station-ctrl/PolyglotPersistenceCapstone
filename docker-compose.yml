@@ -1,0 +1,107 @@
+# Advanced Databases (UEF11 · S1) — teaching lab environment
+# Université Constantine 2 — 2026/2027
+#
+# One file brings up every engine the course needs. Services are grouped by
+# Docker Compose PROFILES so each lab only starts what it needs — a Week 3 SQL
+# lab does not have to boot Cassandra.
+#
+#   sql     -> PostgreSQL 18   (Chapters 1, 2, 3, 5, 7)
+#   doc     -> MongoDB 8       (Chapters 2, 4)
+#   graph   -> Neo4j 5         (Chapters 2 [Cypher], 4)
+#   column  -> Cassandra 5     (Chapters 4, 5)
+#
+# Typical commands:
+#   docker compose --profile sql up -d                       # just Postgres
+#   docker compose --profile doc --profile graph up -d       # Mongo + Neo4j
+#   docker compose --profile sql --profile doc \
+#                  --profile graph --profile column up -d     # everything
+#   docker compose ps                                        # what is running
+#   docker compose down                                      # stop, keep data
+#   docker compose down -v                                   # stop AND wipe data
+
+name: advdb-lab
+
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL — the SQL / PL-pgSQL / object-relational / indexing engine
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: postgres:17
+    profiles: ["sql"]
+    container_name: advdb-postgres
+    environment:
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: student
+      POSTGRES_DB: advdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Any .sql / .sh dropped in this folder runs ONCE on first startup.
+      # Chapter seed schemas will live here.
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student -d advdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # MongoDB — document store (Chapter 4) + JSON query examples (Chapter 2)
+  # ----------------------------------------------------------------------------
+  mongo:
+    image: mongo:8
+    profiles: ["doc"]
+    container_name: advdb-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: student
+      MONGO_INITDB_ROOT_PASSWORD: student
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # Neo4j — graph store + Cypher (Chapter 2 NoSQL DML, Chapter 4)
+  #   Browser UI: http://localhost:7474   |   Bolt driver: bolt://localhost:7687
+  # ----------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5
+    profiles: ["graph"]
+    container_name: advdb-neo4j
+    environment:
+      # Password must be at least 8 characters in Neo4j 5.
+      NEO4J_AUTH: neo4j/studentpw
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4jdata:/data
+    restart: unless-stopped
+
+  # ----------------------------------------------------------------------------
+  # Cassandra — wide-column store (Chapter 4) + tunable consistency (Chapter 5)
+  #   NOTE: heaviest service. Only start it for the weeks that need it.
+  # ----------------------------------------------------------------------------
+  cassandra:
+    image: cassandra:5
+    profiles: ["column"]
+    container_name: advdb-cassandra
+    environment:
+      CASSANDRA_CLUSTER_NAME: advdb-cluster
+      # Kept modest so a single node fits on a student laptop.
+      MAX_HEAP_SIZE: 1G
+      HEAP_NEWSIZE: 256M
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandradata:/var/lib/cassandra
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mongodata:
+  neo4jdata:
+  cassandradata:

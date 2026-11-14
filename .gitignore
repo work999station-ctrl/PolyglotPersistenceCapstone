@@ -1,0 +1,19 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Docker / local data dumps & temporary logs
+*.log
+*.dump
+*.sql.gz
+pgdata/
+mongodata/
+neo4jdata/
+cassandradata/
+
+# Environment overrides
+.env
+.env.local
